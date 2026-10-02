@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { Camera, MediaTypeSelection } from '@capacitor/camera'
 
 const formatarTamanho = (bytes) => {
   if (bytes < 1024) return `${bytes} B`
@@ -15,6 +17,15 @@ function categoria(file) {
   return 'outro'
 }
 
+async function converterEmArquivo(midia, indice) {
+  const resposta = await fetch(midia.webPath)
+  const blob = await resposta.blob()
+  const extensao = midia.metadata?.format ?? 'jpg'
+  return new File([blob], `galeria-capacitor-${indice + 1}.${extensao}`, {
+    type: blob.type,
+  })
+}
+
 /**
  * Dois seletores: galeria (só imagens) e storage (qualquer arquivo).
  * A diferença para a câmera nativa é a ausência do atributo `capture` —
@@ -25,6 +36,7 @@ export default function Arquivos() {
   const storageRef = useRef(null)
   const [itens, setItens] = useState([])
   const [origem, setOrigem] = useState(null)
+  const [erro, setErro] = useState(null)
 
   // Revoga todos os object URLs quando a lista muda ou o componente sai.
   useEffect(() => {
@@ -32,9 +44,29 @@ export default function Arquivos() {
   }, [itens])
 
   function aoSelecionar(evento, rotulo) {
-    const files = [...(evento.target.files ?? [])]
+    mostrarArquivos([...(evento.target.files ?? [])], rotulo)
+    evento.target.value = ''
+  }
+
+  async function abrirGaleriaCapacitor() {
+    setErro(null)
+    try {
+      const { results } = await Camera.chooseFromGallery({
+        mediaType: MediaTypeSelection.All,
+        allowMultipleSelection: true,
+        includeMetadata: true,
+      })
+      const files = await Promise.all(results.map(converterEmArquivo))
+      mostrarArquivos(files, 'Galeria Capacitor')
+    } catch (falha) {
+      setErro(falha.message)
+    }
+  }
+
+  function mostrarArquivos(files, rotulo) {
     if (!files.length) return
 
+    setErro(null)
     setItens((anteriores) => {
       anteriores.forEach((i) => URL.revokeObjectURL(i.url))
       return files.map((file, indice) => ({
@@ -45,7 +77,6 @@ export default function Arquivos() {
       }))
     })
     setOrigem(rotulo)
-    evento.target.value = ''
   }
 
   function limpar() {
@@ -101,7 +132,19 @@ export default function Arquivos() {
         )}
       </div>
 
+      <div className="acoes">
+        <button type="button" onClick={abrirGaleriaCapacitor}>
+          Galeria sdasdasd
+        </button>
+      </div>
+
+      {erro && <p className="erro">{erro}</p>}
+
       <dl className="infos">
+        <div>
+          <dt>Plataforma</dt>
+          <dd>{Capacitor.getPlatform()}</dd>
+        </div>
         <div>
           <dt>Origem</dt>
           <dd>{origem ?? '—'}</dd>

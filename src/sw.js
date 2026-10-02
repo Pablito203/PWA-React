@@ -1,5 +1,28 @@
+import {
+  addPlugins,
+  cleanupOutdatedCaches,
+  createHandlerBoundToURL,
+  precacheAndRoute,
+} from 'workbox-precaching'
+import { NavigationRoute, registerRoute } from 'workbox-routing'
+
+const pedirIndexComoHtmlParaCapacitorInjetarPonte = {
+  requestWillFetch: async ({ request }) => {
+    if (!new URL(request.url).pathname.endsWith('/index.html')) return request
+    return new Request(request, { headers: { Accept: 'text/html' } })
+  },
+}
+
+addPlugins([pedirIndexComoHtmlParaCapacitorInjetarPonte])
+precacheAndRoute(self.__WB_MANIFEST)
+cleanupOutdatedCaches()
+registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html')))
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
+})
+
 /*
- * Anexado ao service worker gerado pelo Workbox (workbox.importScripts).
  * Ações de notificação só existem no service worker: `new Notification()`
  * na página não aceita o campo `actions`.
  */

@@ -7,6 +7,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       // Habilita o service worker também em `npm run dev`
       devOptions: { enabled: true, type: 'module' },
       includeAssets: ['favicon.svg'],
@@ -32,12 +35,8 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
-        globIgnores: ['sw-custom.js'],
-        // Anexa os handlers de notificação ao SW gerado pelo Workbox.
-        importScripts: ['sw-custom.js'],
-        cleanupOutdatedCaches: true,
       },
     }),
   ],
