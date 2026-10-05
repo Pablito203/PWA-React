@@ -40,10 +40,50 @@ npx localtunnel --port 4173
 | Câmera nativa | `<input capture>` — abre o app de câmera do sistema |
 | Galeria e arquivos | Seleção múltipla de imagens e de qualquer tipo de arquivo |
 | Notificações | Permissão, notificação local pelo service worker, ações (responder inline / marcar como lida) |
+| Push real (FCM) | Token FCM do navegador, push pela fila AWS de homologação, payload cru recebido pelo SW |
 | Downloads e links | `<a download>` com blob/data/arquivo real, `target="_blank"`, `window.open`, Web Share |
 | Biometria | WebAuthn com autenticador de plataforma (digital, Face ID, Windows Hello) |
 | Microfone | `MediaRecorder`, medidor de nível ao vivo, reprodução e download |
 | Estado persistido | Contador em `localStorage`, para checar sobrevivência entre sessões |
+
+## Push real (FCM + fila AWS)
+
+Reaproveita a fila de push do Obra Prima sem alterar nada na AWS nem no backend:
+o navegador gera um token FCM do app Web `PWA Teste Web Push` (projeto Firebase
+do OP), e o script local chama a `push-notificacoes-api` de homologação
+— `POST /token` cria o endpoint SNS e `POST /enviar` passa por SQS → `push-envio`
+→ SNS → FCM.
+
+1. `cp .env.exemplo .env.local` e preencha a URL e o `AUTH_TOKEN` da API de push
+   de homologação e a config do app Web do Firebase. O arquivo é ignorado pelo git e as variáveis
+   `PUSH_*` não entram no bundle.
+2. `npm run build && npm run preview`, abra no Chrome e clique em
+   **Gerar token FCM**, depois em **Copiar comando de registro**.
+3. Cole e rode o comando copiado (`npm run push:registrar -- <token>`).
+4. `npm run push:enviar -- <formato>`, com o app aberto ou fechado.
+5. Ao terminar, `npm run push:remover` apaga o endpoint no SNS.
+
+| Formato | Payload |
+|---|---|
+| `backend` *(padrão)* | Igual ao `Firebase.vb`: `data` + `apns`, valores em string |
+| `backend-numerico` | O mesmo, com `tipo_notificacao` numérico, como o backend serializa hoje |
+| `silencioso` | Sincronização (`tipo_notificacao` 4) — o Chrome exige notificação visível, então o SW mostra uma discreta |
+| `notification` | `notification` no topo da mensagem |
+| `aprovacao` | "Teste notificação de aprovação" com os botões **Aprovar** e **Reprovar** (`npm run push:aprovacao`) |
+
+Os botões da notificação de aprovação chamam a API do repo `RegistroAprovacoes`
+(`npm start` lá, porta 3000), que anota `token: X, aprovou` e mostra os registros
+em http://localhost:3000. A URL vai no próprio push (`APROVACAO_API_URL`), então
+o service worker não tem endereço fixo.
+
+No iOS o WebKit não suporta botões em notificação: tocar nela abre o PWA em
+`/aprovacao`, uma tela com **Aprovar** e **Reprovar** que grava na mesma API.
+No Chrome os botões aparecem na própria notificação, e tocar no corpo também
+abre essa tela.
+
+O script mostra o status e o corpo de cada resposta. Falhas de entrega do FCM
+acontecem depois do `Publish` do SNS e só aparecem nos logs da `push-envio` no
+CloudWatch.
 
 ## Notas de plataforma
 
@@ -60,6 +100,9 @@ npx localtunnel --port 4173
 
 ```
 public/sw-custom.js   handlers de notificação e push anexados ao SW do Workbox
+src/firebase.js       config do app Web Firebase e geração do token FCM
+src/PushReal.jsx      painel de push real: token e payloads recebidos
+scripts/push.mjs      registra, envia e remove pela API de push da AWS
 src/usePwa.js         estado de PWA: SW, online, display-mode, prompt de instalação
 src/App.jsx           composição das seções
 vite.config.js        manifest e Workbox (vite-plugin-pwa)

@@ -9,9 +9,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --port 4173"
+    "preview": "vite preview --port 4173",
+    "push:registrar": "node scripts/push.mjs registrar",
+    "push:enviar": "node scripts/push.mjs enviar",
+    "push:remover": "node scripts/push.mjs remover",
+    "push:aprovacao": "node scripts/push.mjs enviar aprovacao"
   },
   "dependencies": {
+    "firebase": "^12.19.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

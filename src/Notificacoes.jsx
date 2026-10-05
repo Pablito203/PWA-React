@@ -222,10 +222,9 @@ export default function Notificacoes() {
       )}
 
       <p className="ajuda aviso">
-        Estas são notificações locais. Para push de verdade (app fechado,
-        disparado pelo servidor) é preciso <code>PushManager.subscribe</code>{' '}
-        com chave VAPID e um back-end. No iOS, notificação só funciona com o app
-        instalado na tela de início.
+        Estas são notificações locais. Push de verdade (app fechado, disparado
+        pelo servidor) está no painel "Push real (FCM)". No iOS, notificação só
+        funciona com o app instalado na tela de início.
       </p>
     </section>
   )

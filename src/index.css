@@ -439,3 +439,17 @@ code {
 .instrucoes b {
   color: #c7d2fe;
 }
+
+.registro summary {
+  cursor: pointer;
+}
+
+.payload {
+  margin: 0.4rem 0 0.2rem;
+  padding: 0.6rem;
+  border-radius: 0.4rem;
+  background: #060b1a;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

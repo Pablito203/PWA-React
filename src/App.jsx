@@ -8,6 +8,7 @@ import Microfone from './Microfone'
 import Rede from './Rede'
 import Downloads from './Downloads'
 import Notificacoes from './Notificacoes'
+import PushReal from './PushReal'
 
 const STORAGE_KEY = 'pwa-teste-contador'
 
@@ -158,6 +159,8 @@ export default function App() {
       <Arquivos />
 
       <Notificacoes />
+
+      <PushReal />
 
       <Downloads />
 

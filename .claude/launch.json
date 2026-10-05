@@ -4,8 +4,19 @@
     {
       "name": "preview-pwa",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "preview"],
+      "runtimeArgs": [
+        "run",
+        "preview"
+      ],
       "port": 4173
+    },
+    {
+      "name": "registro-aprovacoes",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "../RegistroAprovacoes/servidor.js"
+      ],
+      "port": 3000
     }
   ]
 }

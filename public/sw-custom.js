@@ -25,6 +25,11 @@ self.addEventListener('notificationclick', (event) => {
   if (acao !== 'lida') notification.close()
   else notification.close()
 
+  if (acao === 'aprovar' || acao === 'reprovar') {
+    event.waitUntil(registrarAprovacao(notification.data, acao))
+    return
+  }
+
   event.waitUntil(
     (async () => {
       const janelas = await avisarJanelas({
@@ -38,10 +43,12 @@ self.addEventListener('notificationclick', (event) => {
 
       // Só traz o app para frente se não for uma ação silenciosa.
       if (acao === 'lida') return
+      const destino = notification.data?.url ?? '/'
       if (janelas.length) {
         await janelas[0].focus()
+        if (destino !== '/') await janelas[0].navigate(destino)
       } else {
-        await self.clients.openWindow(notification.data?.url ?? '/')
+        await self.clients.openWindow(destino)
       }
     })()
   )
@@ -59,25 +66,124 @@ self.addEventListener('notificationclose', (event) => {
   )
 })
 
-// Permite testar push real pelo DevTools (Application > Service Workers > Push).
 self.addEventListener('push', (event) => {
-  let dados = { titulo: 'Push recebido', corpo: 'Sem payload.' }
-  try {
-    if (event.data) dados = { ...dados, ...event.data.json() }
-  } catch {
-    dados.corpo = event.data?.text() ?? dados.corpo
-  }
+  const payload = lerPayload(event.data)
+  const {
+    titulo,
+    corpo,
+    tag,
+    silenciosa,
+    acoes = [],
+    url = '/',
+  } = montarNotificacao(payload)
+
   event.waitUntil(
-    self.registration.showNotification(dados.titulo, {
-      body: dados.corpo,
-      icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
-      tag: 'push-teste',
-      data: { origem: 'push' },
-      actions: [
-        { action: 'responder', title: 'Responder', type: 'text', placeholder: 'Sua resposta' },
-        { action: 'lida', title: 'Marcar como lida' },
-      ],
-    })
+    Promise.all([
+      self.registration.showNotification(titulo, {
+        body: corpo,
+        icon: '/pwa-192x192.png',
+        badge: '/pwa-192x192.png',
+        tag,
+        silent: silenciosa,
+        actions: acoes,
+        requireInteraction: acoes.length > 0,
+        data: {
+          url,
+          origem: 'push',
+          token: payload.data?.token,
+          urlAprovacao: payload.data?.url_aprovacao,
+        },
+      }),
+      avisarJanelas({ tipo: 'push', payload }),
+    ])
   )
 })
+
+const ACOES_APROVACAO = [
+  { action: 'aprovar', title: 'Aprovar' },
+  { action: 'reprovar', title: 'Reprovar' },
+]
+
+async function registrarAprovacao({ token, urlAprovacao }, decisao) {
+  try {
+    const resposta = await fetch(urlAprovacao, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, decisao }),
+    })
+    if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`)
+  } catch (erro) {
+    await self.registration.showNotification('Falha ao registrar aprovação', {
+      body: `${urlAprovacao}: ${erro.message}`,
+      icon: '/pwa-192x192.png',
+    })
+  }
+}
+
+function urlDaTelaDeAprovacao(data) {
+  const parametros = new URLSearchParams({
+    api: data.url_aprovacao ?? '',
+    mensagem: data.mensagem ?? '',
+  })
+  return `/aprovacao?${parametros}`
+}
+
+function lerPayload(dados) {
+  if (!dados) return {}
+  try {
+    return dados.json()
+  } catch {
+    return { texto: dados.text() }
+  }
+}
+
+function lerJson(texto) {
+  try {
+    return JSON.parse(texto)
+  } catch {
+    return {}
+  }
+}
+
+// O Chrome exige notificação visível em todo push, inclusive nos de sincronização.
+function montarNotificacao(payload) {
+  const data = payload.data ?? {}
+
+  if (payload.notification) {
+    return {
+      titulo: payload.notification.title ?? 'Push',
+      corpo: payload.notification.body ?? '',
+      tag: 'push-notification',
+      silenciosa: false,
+    }
+  }
+
+  if (Number(data.tipo_notificacao) === 1) {
+    const grupo = lerJson(data.notificacao).group
+    const aprovacao = grupo === 'aprovacao'
+    return {
+      titulo: data.titulo ?? 'Notificação',
+      corpo: data.mensagem ?? '',
+      tag: grupo ?? 'push-backend',
+      silenciosa: false,
+      acoes: aprovacao ? ACOES_APROVACAO : [],
+      url: aprovacao ? urlDaTelaDeAprovacao(data) : '/',
+    }
+  }
+
+  if (data.tipo_notificacao) {
+    return {
+      titulo: 'Sincronização recebida',
+      corpo: `tipo_notificacao ${data.tipo_notificacao}`,
+      tag: 'push-sincronizacao',
+      silenciosa: true,
+    }
+  }
+
+  return {
+    titulo: 'Push recebido',
+    corpo: payload.texto ?? 'Sem payload.',
+    tag: 'push-teste',
+    silenciosa: false,
+  }
+}

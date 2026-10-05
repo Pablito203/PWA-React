@@ -1,10 +1,45 @@
+import { writeFile } from 'node:fs/promises'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const ARQUIVO_TOKEN_DISPOSITIVO = '.push-token.local'
+const TAMANHO_MAXIMO_TOKEN = 1000
+
+function salvarTokenDoDispositivo() {
+  const middleware = (requisicao, resposta, proximo) => {
+    if (requisicao.method !== 'POST' || requisicao.url !== '/api/token-dispositivo') {
+      return proximo()
+    }
+
+    let token = ''
+    requisicao.on('data', (parte) => (token += parte))
+    requisicao.on('end', async () => {
+      if (!token || token.length > TAMANHO_MAXIMO_TOKEN) {
+        resposta.statusCode = 400
+        return resposta.end()
+      }
+      await writeFile(ARQUIVO_TOKEN_DISPOSITIVO, token)
+      resposta.statusCode = 204
+      resposta.end()
+    })
+  }
+
+  return {
+    name: 'salvar-token-do-dispositivo',
+    configureServer(servidor) {
+      servidor.middlewares.use(middleware)
+    },
+    configurePreviewServer(servidor) {
+      servidor.middlewares.use(middleware)
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
     react(),
+    salvarTokenDoDispositivo(),
     VitePWA({
       registerType: 'prompt',
       // Habilita o service worker também em `npm run dev`
